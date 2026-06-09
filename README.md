@@ -1,21 +1,29 @@
-# DigitalCodeExtractor
+# Swift Digital Code Extractor
 
-A Swift package for detecting and extracting digital codes (API keys, license keys, 2FA backup codes) from text using Core ML.
+A Swift package for detecting and extracting digital codes — API keys, license keys, and 2FA backup codes — from arbitrary text. It combines high-confidence regex patterns for known formats (Stripe, GitHub, Slack, AWS, Google, and more) with a bundled Core ML classifier for additional detection, while pre-filtering common false positives like error and status codes.
 
 ## Features
 
-- 🔍 **ML-Powered Detection**: Uses a trained Core ML model to identify codes with high accuracy
-- 🎯 **Pattern Recognition**: Built-in detection for common code formats (API keys, licenses, backup codes)
-- 🛡️ **False Positive Filtering**: Automatically filters out error codes, status codes, and common text patterns
-- ⚡ **High Performance**: Optimized for both accuracy and speed
-- 🔧 **Configurable**: Adjust confidence thresholds and detection behaviors
-- 📦 **Self-Contained**: Includes the ML model in the package
+- 🤖 **Bundled Core ML classifier** — a precompiled `NLModel` (`DigitalCodeDetector.mlmodelc`) augments pattern matching with ML-based detection
+- 🔑 **API key detection** — recognizes Stripe, GitHub, Slack, Square, AWS, and Google key prefixes
+- 📜 **License key detection** — matches grouped `XXXX-XXXX-XXXX` style keys
+- 🔢 **Backup code detection** — matches space-separated numeric 2FA codes
+- 📊 **Confidence scoring** — every result carries a 0.0–1.0 confidence value
+- 🧹 **False-positive filtering** — pre-filters prefixes like `ERROR-CODE-`, `STATUS-CODE-`, and `HTTP-`
+- 🔗 **Multi-word detection** — optionally checks word combinations for split codes
+- 🧪 **Single-string check** — `isCode(_:)` returns whether one string is likely a code
+- 🗂️ **Typed results** — extracted codes are classified by `CodeType` with their text range
+- ⚙️ **Configurable** — tune the confidence threshold, combination length, and filtering
+
+## Requirements
+
+- iOS 15.0+ / macOS 14.0+ / tvOS 15.0+ / watchOS 8.0+
+- Swift 5.9+
+- Xcode 15.0+
 
 ## Installation
 
 ### Swift Package Manager
-
-Add to your `Package.swift`:
 
 ```swift
 dependencies: [
@@ -23,178 +31,93 @@ dependencies: [
 ]
 ```
 
-Or in Xcode:
-1. File → Add Package Dependencies
-2. Enter the repository URL
-3. Select version requirements
-
 ## Usage
 
-### Basic Usage
+### Extract Codes
 
 ```swift
 import DigitalCodeExtractor
 
 let extractor = DigitalCodeExtractor()
-let text = "Your API key is sk_test_4242424242424242"
-let codes = extractor.extractCodes(from: text)
+let codes = extractor.extractCodes(from: "Your API key is sk_test_4242424242")
 
 for code in codes {
-    print("Found: \(code.text)")
-    print("Type: \(code.codeType)")
-    print("Confidence: \(code.confidence)")
+    print(code.text, code.confidence, code.codeType)
 }
+// "sk_test_4242424242", 1.0, .apiKey
 ```
 
-### Checking Individual Strings
+### Check a Single String
 
 ```swift
-let (isCode, confidence) = extractor.isCode("ABCD-1234-EFGH-5678")
-if isCode {
-    print("This is a code with \(confidence * 100)% confidence")
-}
+import DigitalCodeExtractor
+
+let extractor = DigitalCodeExtractor()
+let (isCode, confidence) = extractor.isCode("ghp_1234567890abcdef")
+// (true, 1.0)
 ```
 
 ### Custom Configuration
 
 ```swift
+import DigitalCodeExtractor
+
 let config = ExtractorConfiguration(
-    confidenceThreshold: 0.8,              // Higher threshold for fewer false positives
-    checkMultiWordCombinations: true,       // Detect space-separated codes
-    maxCombinationLength: 3,                // Check up to 3-word combinations
-    applyPreFiltering: true                 // Filter known false positives
+    confidenceThreshold: 0.8,
+    checkMultiWordCombinations: true,
+    maxCombinationLength: 4,
+    applyPreFiltering: true
 )
 
 let extractor = DigitalCodeExtractor(configuration: config)
+let codes = extractor.extractCodes(from: "License: ABCD-1234-EFGH-5678")
 ```
 
-## Supported Code Types
+## How It Works
 
-### ✅ Detected with High Accuracy
+`extractCodes(from:)` first applies high-confidence regex patterns for known API-key prefixes, license-key formats, and backup-code formats, then runs the bundled Core ML `NLModel` over individual tokens (and optional multi-word combinations) to catch codes that don't match a known pattern. Results are filtered against known false-positive prefixes, deduplicated (including substring removal), and sorted by confidence.
 
-| Type | Example | Detection Method |
-|------|---------|-----------------|
-| **API Keys** | `sk_test_4242424242424242` | Pattern + ML |
-| **License Keys** | `ABCD-1234-EFGH-5678` | Pattern + ML |
-| **2FA Backup Codes** | `1234 5678 9012` | Pattern + ML |
-| **GitHub Tokens** | `ghp_1234567890abcdef` | Pattern |
-| **Steam Keys** | `XXXXX-XXXXX-XXXXX` | ML |
-| **Generic Tokens** | `eyJhbGciOiJIUzI1NiIs...` | ML |
+## Models
 
-### ❌ Intentionally Not Detected
+### `ExtractedCode`
 
-- Error codes (`ERROR-CODE-404`)
-- Status codes (`HTTP-200`, `STATUS-500`)
-- Build/version numbers (`BUILD-12345`, `v2.0.1`)
-- IP addresses (`192.168.1.1`)
-- Email addresses (`user@example.com`)
-- Phone numbers (`555-123-4567`)
-- URLs (`www.example.com`)
+| Property | Type | Description |
+|----------|------|-------------|
+| `text` | `String` | The extracted code text |
+| `confidence` | `Double` | Confidence score (0.0–1.0) |
+| `range` | `Range<String.Index>?` | Location in the source text, if available |
+| `codeType` | `CodeType` | Detected code type |
 
-### ⚠️ Limited Detection
+### `ExtractorConfiguration`
 
-- **Short PIN codes** (4-6 digits): Too ambiguous, many false positives
-- **Physical access codes**: Designed for digital codes, not door/gate codes
+| Property | Type | Description |
+|----------|------|-------------|
+| `confidenceThreshold` | `Double` | Minimum confidence to accept a prediction (default `0.7`) |
+| `checkMultiWordCombinations` | `Bool` | Check word combinations (default `true`) |
+| `maxCombinationLength` | `Int` | Max words to combine (default `4`) |
+| `applyPreFiltering` | `Bool` | Filter known false positives (default `true`) |
 
-## Code Types
+`CodeType` cases are `.apiKey`, `.license`, `.backupCode`, `.giftCard`, and `.unknown`.
 
-```swift
-public enum CodeType {
-    case apiKey      // API keys with known prefixes
-    case license     // Software license keys
-    case backupCode  // 2FA backup codes
-    case giftCard    // Gift/promo codes
-    case unknown     // Detected but type unclear
-}
-```
+## Use Cases
 
-## Extracted Code Structure
-
-```swift
-public struct ExtractedCode {
-    let text: String                    // The extracted code
-    let confidence: Double               // ML confidence (0.0-1.0)
-    let range: Range<String.Index>?     // Position in original text
-    let codeType: CodeType               // Type of code detected
-}
-```
-
-## Performance
-
-- **Short text** (<100 chars): ~5ms
-- **Long text** (1000+ chars): ~50ms
-- **Memory usage**: ~20MB (including ML model)
-
-## Requirements
-
-- iOS 15.0+ / macOS 12.0+ / tvOS 15.0+ / watchOS 8.0+
-- Swift 5.9+
-- Core ML framework
-
-## Model Training
-
-The included ML model was trained on:
-- 10,000+ examples of various code formats
-- Targeted negative examples for common false positives
-- Balanced dataset of codes vs non-codes
-
-Model accuracy:
-- **Precision**: ~95% (few false positives)
-- **Recall**: ~92% (catches most codes)
-- **F1 Score**: ~93.5%
-
-## Advanced Usage
-
-### Processing Camera Text
-
-```swift
-// Ideal for OCR/camera text extraction
-let cameraText = "Gate Code: 1234\nAPI Key: sk_test_abc123"
-let codes = extractor.extractCodes(from: cameraText)
-// Returns only the API key, not the short gate code
-```
-
-### Batch Processing
-
-```swift
-let documents = ["doc1 text", "doc2 text", "doc3 text"]
-let allCodes = documents.flatMap { extractor.extractCodes(from: $0) }
-```
-
-### Integration with Text Recognition
-
-```swift
-import Vision
-
-// After VNRecognizeTextRequest
-let recognizedText = observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-let codes = extractor.extractCodes(from: recognizedText)
-```
+- Secret scanning and leak detection in text or logs
+- Auto-detecting codes pasted into chat or support tools
+- Extracting license keys and 2FA backup codes from messages
+- Redaction and data-classification pipelines
 
 ## Testing
-
-Run the test suite:
 
 ```bash
 swift test
 ```
 
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
+The test suite covers known-pattern extraction (API keys, license keys, backup codes), ML-based detection, false-positive filtering, confidence thresholds, and deduplication.
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License — see LICENSE file for details.
 
-## Support
+## Author
 
-For issues, questions, or suggestions, please open an issue on GitHub.
-
-## Acknowledgments
-
-Built with Core ML and Natural Language frameworks by Apple.
+Created by David Sherlock ([ArrayPress](https://github.com/arraypress)) in 2026.
