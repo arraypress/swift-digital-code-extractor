@@ -24,7 +24,9 @@ let package = Package(
         .target(
             name: "DigitalCodeExtractor",
             resources: [
-                .process("Resources")
+                // Copy the pre-compiled Core ML model verbatim. `.copy` preserves
+                // the `.mlmodelc` bundle directory (which `.process` would flatten).
+                .copy("Resources/DigitalCodeDetector.mlmodelc")
             ]
         ),
         .testTarget(

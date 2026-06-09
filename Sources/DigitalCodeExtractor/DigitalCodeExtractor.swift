@@ -71,7 +71,7 @@ public class DigitalCodeExtractor {
                 self.mlModel = nil
             }
         } else {
-            print("DigitalCodeExtractor: Could not find CodeDetector.mlmodelc in bundle")
+            print("DigitalCodeExtractor: Could not find DigitalCodeDetector.mlmodelc in bundle")
             self.mlModel = nil
         }
     }
