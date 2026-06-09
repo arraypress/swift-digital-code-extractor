@@ -196,7 +196,7 @@ final class DigitalCodeExtractorTests: XCTestCase {
     
     func testIsCodeMethod() {
         // Positive cases
-        XCTAssertTrue(extractor.isCode("sk_test_123456789").0)
+        XCTAssertTrue(extractor.isCode("sk_test_1234567890").0)
         XCTAssertTrue(extractor.isCode("ABCD-1234-EFGH").0)
         XCTAssertTrue(extractor.isCode("1234 5678 9012").0)
         
@@ -207,7 +207,7 @@ final class DigitalCodeExtractorTests: XCTestCase {
     }
     
     func testIsCodeConfidence() {
-        let result = extractor.isCode("sk_test_123456789", includeConfidence: true)
+        let result = extractor.isCode("sk_test_1234567890", includeConfidence: true)
         XCTAssertTrue(result.0)
         XCTAssertEqual(result.1, 1.0, accuracy: 0.01, "Known patterns should have 100% confidence")
     }
@@ -250,13 +250,13 @@ final class DigitalCodeExtractorTests: XCTestCase {
     func testVeryLongInput() {
         // Reduced from 1000 to 50 repetitions - still tests long input without hanging
         let longText = String(repeating: "Lorem ipsum dolor sit amet ", count: 50)
-        let codesText = longText + "sk_test_123456789 " + longText
+        let codesText = longText + "sk_test_1234567890 " + longText
         
         let codes = extractor.extractCodes(from: codesText)
         XCTAssertFalse(codes.isEmpty, "Should find code in long text")
         
         // Check that the API key was found (might include trailing text in some cases)
-        let foundApiKey = codes.contains { $0.text.starts(with: "sk_test_123456789") }
+        let foundApiKey = codes.contains { $0.text.starts(with: "sk_test_1234567890") }
         XCTAssertTrue(foundApiKey, "Should find the API key")
     }
     
@@ -270,7 +270,7 @@ final class DigitalCodeExtractorTests: XCTestCase {
     // MARK: - Performance Tests
     
     func testPerformanceShortText() {
-        let text = "Your API key is sk_test_123456789"
+        let text = "Your API key is sk_test_1234567890"
         
         measure {
             _ = extractor.extractCodes(from: text)

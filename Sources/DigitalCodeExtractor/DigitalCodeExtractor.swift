@@ -323,7 +323,16 @@ public class DigitalCodeExtractor {
                 return true
             }
         }
-        
+
+        // Check for backup code format (#### #### ####)
+        let backupRegex = try? NSRegularExpression(pattern: #"^\d{4}(?:\s+\d{4}){1,3}$"#)
+        if let regex = backupRegex {
+            let range = NSRange(text.startIndex..., in: text)
+            if regex.firstMatch(in: text, range: range) != nil {
+                return true
+            }
+        }
+
         return false
     }
     
